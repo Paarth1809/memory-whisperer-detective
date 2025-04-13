@@ -27,6 +27,7 @@ export interface SystemMemoryInfo {
   usedMemory: string;
   freeMemory: string;
   memoryUsagePercentage: number;
+  processesMemoryPercentage: number;
 }
 
 export const mockProcesses: Process[] = [
@@ -155,7 +156,8 @@ export const mockSystemInfo: SystemMemoryInfo = {
   totalMemory: "16.0 GB",
   usedMemory: "8.5 GB",
   freeMemory: "7.5 GB",
-  memoryUsagePercentage: 53
+  memoryUsagePercentage: 53,
+  processesMemoryPercentage: 78
 };
 
 export const mockAnalyzeSystemMemory = (): Promise<{
