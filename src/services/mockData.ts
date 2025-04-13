@@ -1,4 +1,3 @@
-
 export interface Process {
   pid: number;
   name: string;
@@ -21,6 +20,13 @@ export interface NetworkConnection {
   remotePort: number;
   state: string;
   isSuspicious: boolean;
+}
+
+export interface SystemMemoryInfo {
+  totalMemory: string;
+  usedMemory: string;
+  freeMemory: string;
+  memoryUsagePercentage: number;
 }
 
 export const mockProcesses: Process[] = [
@@ -145,18 +151,27 @@ export const mockNetworkConnections: NetworkConnection[] = [
   }
 ];
 
-export const mockAnalyzeMemoryDump = (file: File): Promise<{
+export const mockSystemInfo: SystemMemoryInfo = {
+  totalMemory: "16.0 GB",
+  usedMemory: "8.5 GB",
+  freeMemory: "7.5 GB",
+  memoryUsagePercentage: 53
+};
+
+export const mockAnalyzeSystemMemory = (): Promise<{
   processes: Process[],
-  connections: NetworkConnection[]
+  connections: NetworkConnection[],
+  systemInfo: SystemMemoryInfo
 }> => {
-  // In a real application, this would actually analyze the memory dump
+  // In a real application, this would call system APIs to get real memory information
   // For now, we'll just return our mock data after a delay to simulate processing
   return new Promise((resolve) => {
     setTimeout(() => {
       resolve({
         processes: mockProcesses,
-        connections: mockNetworkConnections
+        connections: mockNetworkConnections,
+        systemInfo: mockSystemInfo
       });
-    }, 2000);
+    }, 1000);
   });
 };

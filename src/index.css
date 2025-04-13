@@ -80,3 +80,21 @@
   border: 1px solid theme("colors.cyber.blue");
   pointer-events: none;
 }
+
+/* Memory analyzer specific styles */
+.memory-scanner-effect {
+  position: relative;
+  overflow: hidden;
+}
+
+.memory-scanner-effect::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, transparent, rgba(0, 240, 255, 0.2), transparent);
+  animation: memory-scan 2s infinite;
+  z-index: 1;
+}

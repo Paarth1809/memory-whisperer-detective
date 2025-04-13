@@ -1,18 +1,20 @@
 
 import React from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Process, NetworkConnection } from '@/services/mockData';
+import { Process, NetworkConnection, SystemMemoryInfo } from '@/services/mockData';
 import ProcessList from './ProcessList';
 import NetworkConnections from './NetworkConnections';
+import SystemMemoryInfoComponent from './SystemMemoryInfo';
 import { Activity, Cpu, Network, Shield } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface DashboardProps {
   processes: Process[];
   connections: NetworkConnection[];
+  systemInfo: SystemMemoryInfo;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ processes, connections }) => {
+const Dashboard: React.FC<DashboardProps> = ({ processes, connections, systemInfo }) => {
   const suspiciousProcesses = processes.filter(p => p.isSuspicious);
   const suspiciousConnections = connections.filter(c => c.isSuspicious);
 
@@ -66,12 +68,12 @@ const Dashboard: React.FC<DashboardProps> = ({ processes, connections }) => {
             <CardDescription>Memory Usage</CardDescription>
             <CardTitle className="text-2xl flex items-center gap-2">
               <Activity size={20} className="text-cyber-blue" />
-              406.9 MB
+              {systemInfo.usedMemory}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-sm text-muted-foreground">
-              Across {processes.length} running processes
+              {systemInfo.memoryUsagePercentage}% of {systemInfo.totalMemory} used
             </div>
           </CardContent>
         </Card>
@@ -91,12 +93,14 @@ const Dashboard: React.FC<DashboardProps> = ({ processes, connections }) => {
                   {suspiciousProcesses.length + suspiciousConnections.length} total suspicious activities
                 </span>
               ) : (
-                <span className="text-green-400">No threats detected in memory dump</span>
+                <span className="text-green-400">No threats detected</span>
               )}
             </div>
           </CardContent>
         </Card>
       </div>
+
+      <SystemMemoryInfoComponent systemInfo={systemInfo} />
 
       <Tabs defaultValue="processes" className="w-full">
         <TabsList className="bg-cyber-darker border border-cyber-blue/30 w-full flex justify-start">
