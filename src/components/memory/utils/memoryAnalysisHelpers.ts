@@ -7,6 +7,14 @@ export interface BottleneckInfo {
   suggestion: string;
 }
 
+export interface MemoryForensicFeature {
+  id: string;
+  title: string;
+  description: string;
+  icon: string;
+  category: 'analysis' | 'detection' | 'extraction' | 'visualization' | 'utilities';
+}
+
 // Determine risk level based on memory analysis score
 export const getRiskLevel = (memoryAnalysisScore: number | null) => {
   if (memoryAnalysisScore === null) return { level: "scanning", color: "text-cyber-blue" };
@@ -82,7 +90,21 @@ export const analyzeMemoryDump = (fileSize: number) => {
       "dll-enumeration", 
       "network-analysis", 
       "malware-detection", 
-      "string-extraction"
+      "string-extraction",
+      "file-extraction",
+      "volatile-data-parsing",
+      "browser-artifact-recovery",
+      "credential-harvesting",
+      "command-line-history",
+      "memory-visualization",
+      "registry-dump",
+      "timeline-analysis",
+      "crypto-detection",
+      "yara-scan",
+      "plugin-support",
+      "report-generation",
+      "file-hashing",
+      "cross-platform-analysis"
     ]
   };
 };
@@ -99,4 +121,155 @@ export const formatAnalysisName = (analysisType: string) => {
     .split('-')
     .map(word => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
+};
+
+// Get comprehensive list of forensic features
+export const getAllForensicFeatures = (): MemoryForensicFeature[] => {
+  return [
+    // Analysis Tools
+    {
+      id: "process-analysis",
+      title: "Process & Thread Analysis",
+      description: "Analyze running processes and thread structures",
+      icon: "cpu",
+      category: "analysis"
+    },
+    {
+      id: "dll-enumeration",
+      title: "DLL & Handle Enumeration",
+      description: "List loaded DLLs and open handles",
+      icon: "library",
+      category: "analysis"
+    },
+    {
+      id: "network-analysis",
+      title: "Network Connections",
+      description: "Map active network connections and sockets",
+      icon: "network",
+      category: "analysis"
+    },
+    {
+      id: "string-extraction",
+      title: "String Extraction",
+      description: "Extract and analyze strings from memory",
+      icon: "text",
+      category: "extraction"
+    },
+    {
+      id: "registry-dump",
+      title: "Registry Dumping",
+      description: "Extract registry hives from memory",
+      icon: "database",
+      category: "extraction"
+    },
+    
+    // Detection Tools
+    {
+      id: "malware-detection",
+      title: "Malware Detection",
+      description: "Scan for malware signatures in memory",
+      icon: "shield-x",
+      category: "detection"
+    },
+    {
+      id: "crypto-detection",
+      title: "Cryptographic Key Detection",
+      description: "Locate encryption keys in memory",
+      icon: "key",
+      category: "detection"
+    },
+    {
+      id: "yara-scan",
+      title: "YARA Rule Scanning",
+      description: "Apply custom YARA rules to memory",
+      icon: "search",
+      category: "detection"
+    },
+    {
+      id: "timeline-analysis",
+      title: "Timeline Reconstruction",
+      description: "Reconstruct system event timeline",
+      icon: "clock",
+      category: "analysis"
+    },
+    
+    // New extraction features
+    {
+      id: "file-extraction",
+      title: "File Extraction",
+      description: "Extract files directly from memory dumps",
+      icon: "file",
+      category: "extraction"
+    },
+    {
+      id: "volatile-data-parsing",
+      title: "Volatile Data Parsing",
+      description: "Extract volatile system configurations and settings",
+      icon: "settings",
+      category: "extraction"
+    },
+    {
+      id: "browser-artifact-recovery",
+      title: "Browser Artifact Recovery",
+      description: "Recover browser history, cookies and cache",
+      icon: "globe",
+      category: "extraction"
+    },
+    {
+      id: "credential-harvesting",
+      title: "Credential Harvesting Detection",
+      description: "Identify potential credential theft in memory",
+      icon: "key-round",
+      category: "detection"
+    },
+    {
+      id: "command-line-history",
+      title: "Command Line History",
+      description: "Extract command history from shells",
+      icon: "terminal",
+      category: "extraction"
+    },
+    
+    // Visualization and reporting features
+    {
+      id: "memory-visualization",
+      title: "Memory Visualization",
+      description: "Visualize memory structures and relationships",
+      icon: "bar-chart-2",
+      category: "visualization"
+    },
+    {
+      id: "plugin-support",
+      title: "Plugins Support",
+      description: "Load additional analysis plugins",
+      icon: "puzzle",
+      category: "utilities"
+    },
+    {
+      id: "report-generation",
+      title: "Report Generation",
+      description: "Create detailed forensic reports",
+      icon: "file-text",
+      category: "utilities"
+    },
+    {
+      id: "file-hashing",
+      title: "Integrity Checking",
+      description: "Calculate and verify file hashes",
+      icon: "hash",
+      category: "utilities"
+    },
+    {
+      id: "cross-platform-analysis",
+      title: "Cross-Platform Support",
+      description: "Analyze memory dumps from various OS platforms",
+      icon: "layers",
+      category: "utilities"
+    }
+  ];
+};
+
+// Get features by category
+export const getFeaturesByCategory = (category: string): MemoryForensicFeature[] => {
+  return getAllForensicFeatures().filter(feature => feature.category === category);
 };
