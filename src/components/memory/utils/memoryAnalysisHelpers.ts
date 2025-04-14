@@ -70,3 +70,33 @@ export const calculateBottlenecks = (
   
   return bottlenecks;
 };
+
+// Forensics-specific utility functions
+export const analyzeMemoryDump = (fileSize: number) => {
+  // In a real implementation, this would analyze an actual memory dump file
+  const analysisTime = Math.round(fileSize / (1024 * 1024) * 2); // 2 seconds per MB
+  return {
+    estimatedTime: analysisTime,
+    supportedAnalyses: [
+      "process-analysis", 
+      "dll-enumeration", 
+      "network-analysis", 
+      "malware-detection", 
+      "string-extraction"
+    ]
+  };
+};
+
+export const getForensicAnalysisStatus = (analysisType: string, completedAnalyses: string[]) => {
+  if (completedAnalyses.includes(analysisType)) {
+    return "completed";
+  }
+  return "pending";
+};
+
+export const formatAnalysisName = (analysisType: string) => {
+  return analysisType
+    .split('-')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+};

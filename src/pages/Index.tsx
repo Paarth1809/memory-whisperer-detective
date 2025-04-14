@@ -4,6 +4,7 @@ import Dashboard from '@/components/Dashboard';
 import { mockAnalyzeSystemMemory, Process, NetworkConnection, SystemMemoryInfo } from '@/services/mockData';
 import { Button } from '@/components/ui/button';
 import { RotateCcw, RefreshCw } from 'lucide-react';
+import MemoryForensicsPanel from '@/components/memory/MemoryForensicsPanel';
 
 const Index = () => {
   const [analysisResults, setAnalysisResults] = useState<{
@@ -13,6 +14,7 @@ const Index = () => {
   } | null>(null);
   
   const [analyzing, setAnalyzing] = useState(false);
+  const [showForensics, setShowForensics] = useState(false);
 
   const analyzeSystemMemory = async () => {
     setAnalyzing(true);
@@ -44,20 +46,33 @@ const Index = () => {
             </h1>
           </div>
           
-          <Button 
-            variant="outline" 
-            size="sm"
-            className="border-cyber-blue/50 text-cyber-blue hover:bg-cyber-blue/10"
-            onClick={analyzeSystemMemory}
-            disabled={analyzing}
-          >
-            <RefreshCw size={16} className={`mr-2 ${analyzing ? 'animate-spin' : ''}`} />
-            Refresh Analysis
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-cyber-blue/50 text-cyber-blue hover:bg-cyber-blue/10"
+              onClick={() => setShowForensics(!showForensics)}
+            >
+              {showForensics ? 'Hide Forensics Tools' : 'Show Forensics Tools'}
+            </Button>
+            
+            <Button 
+              variant="outline" 
+              size="sm"
+              className="border-cyber-blue/50 text-cyber-blue hover:bg-cyber-blue/10"
+              onClick={analyzeSystemMemory}
+              disabled={analyzing}
+            >
+              <RefreshCw size={16} className={`mr-2 ${analyzing ? 'animate-spin' : ''}`} />
+              Refresh Analysis
+            </Button>
+          </div>
         </div>
       </header>
       
       <main className="container px-4 py-6 max-w-7xl mx-auto">
+        {showForensics && <MemoryForensicsPanel />}
+        
         {analyzing ? (
           <div className="flex flex-col items-center justify-center py-20">
             <div className="h-16 w-16 rounded-full border-4 border-cyber-blue border-t-transparent animate-spin mb-4" />
