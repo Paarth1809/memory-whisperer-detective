@@ -19,6 +19,7 @@ import {
 } from './utils/memoryAnalysisHelpers';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import MemoryDumpReport from './MemoryDumpReport';
 
 interface MemoryForensicsPanelProps {
   onAnalysisComplete?: (results: any) => void;
@@ -386,36 +387,41 @@ const MemoryForensicsPanel: React.FC<MemoryForensicsPanelProps> = ({ onAnalysisC
         </Tabs>
         
         {completedAnalyses.length > 0 && (
-          <Collapsible className="mt-6">
-            <CollapsibleTrigger className="w-full p-4 bg-cyber-darker rounded-md border border-cyber-blue/20 flex items-center justify-between">
-              <h3 className="text-sm font-medium">Completed Analyses ({completedAnalyses.length})</h3>
-              <div className="flex items-center gap-1">
-                <Badge variant="outline" className="bg-green-500/10 text-green-400 border-green-400/30">
-                  {completedAnalyses.length} completed
-                </Badge>
-              </div>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="p-4 mt-2 bg-cyber-darker rounded-md border border-cyber-blue/20">
-              <div className="space-y-4 max-h-96 overflow-y-auto">
-                {completedAnalyses.map((analysis, index) => (
-                  <div key={index} className="p-3 bg-cyber-dark/80 rounded-md border border-cyber-blue/10">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="flex items-center gap-2">
-                        <CheckCircle size={14} className="text-green-400" />
-                        {getFeatureTitle(analysis)}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {new Date().toLocaleTimeString()}
-                      </span>
+          <>
+            <Collapsible className="mt-6">
+              <CollapsibleTrigger className="w-full p-4 bg-cyber-darker rounded-md border border-cyber-blue/20 flex items-center justify-between">
+                <h3 className="text-sm font-medium">Completed Analyses ({completedAnalyses.length})</h3>
+                <div className="flex items-center gap-1">
+                  <Badge variant="outline" className="bg-green-500/10 text-green-400 border-green-400/30">
+                    {completedAnalyses.length} completed
+                  </Badge>
+                </div>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="p-4 mt-2 bg-cyber-darker rounded-md border border-cyber-blue/20">
+                <div className="space-y-4 max-h-96 overflow-y-auto">
+                  {completedAnalyses.map((analysis, index) => (
+                    <div key={index} className="p-3 bg-cyber-dark/80 rounded-md border border-cyber-blue/10">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="flex items-center gap-2">
+                          <CheckCircle size={14} className="text-green-400" />
+                          {getFeatureTitle(analysis)}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {new Date().toLocaleTimeString()}
+                        </span>
+                      </div>
+                      <div className="text-xs mt-2 text-cyber-blue/90">
+                        {analysisResults[analysis] ?? "No result."}
+                      </div>
                     </div>
-                    <div className="text-xs mt-2 text-cyber-blue/90">
-                      {analysisResults[analysis] ?? "No result."}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
+                  ))}
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+            {memoryDumpUploaded && (
+              <MemoryDumpReport analysisResults={analysisResults} />
+            )}
+          </>
         )}
       </CardContent>
     </Card>
