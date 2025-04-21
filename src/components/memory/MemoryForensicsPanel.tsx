@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -36,18 +35,16 @@ const MemoryForensicsPanel: React.FC<MemoryForensicsPanelProps> = ({ onAnalysisC
   const [batchAnalysisMode, setBatchAnalysisMode] = useState<boolean>(false);
   const [reportGenerating, setReportGenerating] = useState<boolean>(false);
   const [batchProgress, setBatchProgress] = useState<number>(0);
+  const [analysisResults, setAnalysisResults] = useState<Record<string, string>>({});
 
-  // Handle memory dump upload
   const handleMemoryDumpUpload = (file: File) => {
     setMemoryDumpUploaded(true);
     toast({
       title: "Memory Dump Uploaded",
       description: `${file.name} (${(file.size / (1024 * 1024)).toFixed(2)} MB) uploaded successfully.`,
     });
-    // In a real implementation, we would process the file here
   };
 
-  // Start analysis for a single feature
   const startAnalysis = (analysisType: string) => {
     if (analysisInProgress) return;
     
@@ -60,7 +57,6 @@ const MemoryForensicsPanel: React.FC<MemoryForensicsPanelProps> = ({ onAnalysisC
       description: `${getFeatureTitle(analysisType)} analysis in progress...`,
     });
     
-    // Simulate analysis progress
     const interval = setInterval(() => {
       setAnalysisProgress(prev => {
         const newProgress = prev + Math.random() * 10;
@@ -68,6 +64,11 @@ const MemoryForensicsPanel: React.FC<MemoryForensicsPanelProps> = ({ onAnalysisC
           clearInterval(interval);
           setAnalysisInProgress(false);
           setCompletedAnalyses(prev => [...prev, analysisType]);
+          
+          setAnalysisResults(prev => ({
+            ...prev,
+            [analysisType]: `Result: ${getFeatureTitle(analysisType)} found 0 critical anomalies. (Demo output)`
+          }));
           
           toast({
             title: "Analysis Complete",
@@ -89,7 +90,6 @@ const MemoryForensicsPanel: React.FC<MemoryForensicsPanelProps> = ({ onAnalysisC
     }, 300);
   };
 
-  // Handle batch analysis of multiple features
   const startBatchAnalysis = () => {
     if (selectedFeatures.length === 0) {
       toast({
@@ -108,7 +108,6 @@ const MemoryForensicsPanel: React.FC<MemoryForensicsPanelProps> = ({ onAnalysisC
       description: `${selectedFeatures.length} features selected for analysis.`,
     });
     
-    // Process features one by one
     let featureIndex = 0;
     const processNextFeature = () => {
       if (featureIndex >= selectedFeatures.length) {
@@ -125,7 +124,6 @@ const MemoryForensicsPanel: React.FC<MemoryForensicsPanelProps> = ({ onAnalysisC
       setAnalysisInProgress(true);
       setAnalysisProgress(0);
       
-      // Simulate analysis progress for current feature
       let progress = 0;
       const interval = setInterval(() => {
         progress += Math.random() * 10;
@@ -134,6 +132,10 @@ const MemoryForensicsPanel: React.FC<MemoryForensicsPanelProps> = ({ onAnalysisC
         if (progress >= 100) {
           clearInterval(interval);
           setCompletedAnalyses(prev => [...prev, feature]);
+          setAnalysisResults(prev => ({
+            ...prev,
+            [feature]: `Result: ${getFeatureTitle(feature)} found 0 critical anomalies. (Demo output)`
+          }));
           featureIndex++;
           setBatchProgress((featureIndex / selectedFeatures.length) * 100);
           setAnalysisInProgress(false);
@@ -145,7 +147,6 @@ const MemoryForensicsPanel: React.FC<MemoryForensicsPanelProps> = ({ onAnalysisC
     processNextFeature();
   };
 
-  // Toggle feature selection for batch processing
   const toggleFeatureSelection = (featureId: string) => {
     setSelectedFeatures(prev => {
       if (prev.includes(featureId)) {
@@ -156,7 +157,6 @@ const MemoryForensicsPanel: React.FC<MemoryForensicsPanelProps> = ({ onAnalysisC
     });
   };
 
-  // Generate forensics report
   const generateReport = () => {
     if (completedAnalyses.length === 0) {
       toast({
@@ -169,7 +169,6 @@ const MemoryForensicsPanel: React.FC<MemoryForensicsPanelProps> = ({ onAnalysisC
     
     setReportGenerating(true);
     
-    // Simulate report generation
     setTimeout(() => {
       setReportGenerating(false);
       
@@ -182,12 +181,10 @@ const MemoryForensicsPanel: React.FC<MemoryForensicsPanelProps> = ({ onAnalysisC
     }, 2000);
   };
 
-  // Check if an analysis is completed
   const isAnalysisCompleted = (analysisType: string) => {
     return completedAnalyses.includes(analysisType);
   };
 
-  // Get icon component based on icon name
   const getIconComponent = (iconName: string) => {
     const iconMap: Record<string, React.ReactNode> = {
       "cpu": <Cpu size={18} className="text-cyan-400" />,
@@ -214,13 +211,11 @@ const MemoryForensicsPanel: React.FC<MemoryForensicsPanelProps> = ({ onAnalysisC
     return iconMap[iconName] || <HardDrive size={18} className="text-blue-200" />;
   };
 
-  // Get feature title by ID
   const getFeatureTitle = (featureId: string) => {
     const feature = getAllForensicFeatures().find(f => f.id === featureId);
     return feature ? feature.title : featureId;
   };
 
-  // Render feature card for forensic analysis types
   const renderFeatureCard = (feature: MemoryForensicFeature) => {
     const isCompleted = isAnalysisCompleted(feature.id);
     const isInProgress = analysisInProgress && currentAnalysisType === feature.id;
@@ -267,7 +262,6 @@ const MemoryForensicsPanel: React.FC<MemoryForensicsPanelProps> = ({ onAnalysisC
     );
   };
 
-  // Group features by category 
   const renderFeaturesByCategory = (category: string, title: string) => {
     const features = getFeaturesByCategory(category);
     
@@ -402,16 +396,21 @@ const MemoryForensicsPanel: React.FC<MemoryForensicsPanelProps> = ({ onAnalysisC
               </div>
             </CollapsibleTrigger>
             <CollapsibleContent className="p-4 mt-2 bg-cyber-darker rounded-md border border-cyber-blue/20">
-              <div className="space-y-2 max-h-60 overflow-y-auto">
+              <div className="space-y-4 max-h-96 overflow-y-auto">
                 {completedAnalyses.map((analysis, index) => (
-                  <div key={index} className="flex items-center justify-between text-sm p-2 bg-cyber-dark/60 rounded-md">
-                    <span className="flex items-center gap-2">
-                      <CheckCircle size={14} className="text-green-400" />
-                      {getFeatureTitle(analysis)}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {new Date().toLocaleTimeString()}
-                    </span>
+                  <div key={index} className="p-3 bg-cyber-dark/80 rounded-md border border-cyber-blue/10">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="flex items-center gap-2">
+                        <CheckCircle size={14} className="text-green-400" />
+                        {getFeatureTitle(analysis)}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {new Date().toLocaleTimeString()}
+                      </span>
+                    </div>
+                    <div className="text-xs mt-2 text-cyber-blue/90">
+                      {analysisResults[analysis] ?? "No result."}
+                    </div>
                   </div>
                 ))}
               </div>
