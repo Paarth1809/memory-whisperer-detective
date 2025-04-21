@@ -1,4 +1,3 @@
-
 import { SystemMemoryInfo } from '@/services/mockData';
 
 export interface BottleneckInfo {
@@ -126,7 +125,6 @@ export const formatAnalysisName = (analysisType: string) => {
 // Get comprehensive list of forensic features
 export const getAllForensicFeatures = (): MemoryForensicFeature[] => {
   return [
-    // Analysis Tools
     {
       id: "process-analysis",
       title: "Process & Thread Analysis",
@@ -163,7 +161,6 @@ export const getAllForensicFeatures = (): MemoryForensicFeature[] => {
       category: "extraction"
     },
     
-    // Detection Tools
     {
       id: "malware-detection",
       title: "Malware Detection",
@@ -193,7 +190,6 @@ export const getAllForensicFeatures = (): MemoryForensicFeature[] => {
       category: "analysis"
     },
     
-    // New extraction features
     {
       id: "file-extraction",
       title: "File Extraction",
@@ -230,7 +226,6 @@ export const getAllForensicFeatures = (): MemoryForensicFeature[] => {
       category: "extraction"
     },
     
-    // Visualization and reporting features
     {
       id: "memory-visualization",
       title: "Memory Visualization",
@@ -265,6 +260,28 @@ export const getAllForensicFeatures = (): MemoryForensicFeature[] => {
       description: "Analyze memory dumps from various OS platforms",
       icon: "layers",
       category: "utilities"
+    },
+    
+    {
+      id: "volatility",
+      title: "Volatility Analysis",
+      description: "Leverage the Volatility Framework for advanced memory forensics.",
+      icon: "cpu",
+      category: "analysis"
+    },
+    {
+      id: "flash",
+      title: "Flash Artifact Analysis",
+      description: "Analyze volatile data with the Flash memory forensics tool.",
+      icon: "search",
+      category: "analysis"
+    },
+    {
+      id: "flask_sqlalchemy",
+      title: "Flask SQLAlchemy Artifacts",
+      description: "Detect and analyze Flask SQLAlchemy ORM artifacts in memory.",
+      icon: "server",
+      category: "analysis"
     }
   ];
 };
