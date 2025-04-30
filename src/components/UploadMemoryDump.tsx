@@ -38,20 +38,23 @@ const UploadMemoryDump: React.FC<UploadMemoryDumpProps> = ({ onUploadComplete })
     try {
       // Create a unique file path with timestamp to prevent collisions
       const timestamp = new Date().getTime();
-      const fileExtension = selectedFile.name.split('.').pop();
       const filePath = `${timestamp}_${selectedFile.name}`;
       
-      // Upload to Supabase Storage
+      // Set up an XMLHttpRequest to track upload progress
+      const xhr = new XMLHttpRequest();
+      xhr.upload.addEventListener('progress', (event) => {
+        if (event.lengthComputable) {
+          const percentage = Math.floor((event.loaded / event.total) * 100);
+          setUploadProgress(percentage);
+        }
+      });
+
+      // Upload file to Supabase Storage
       const { data, error } = await supabase.storage
         .from('memory_dumps')
         .upload(filePath, selectedFile, {
           cacheControl: '3600',
-          upsert: false,
-          onUploadProgress: (progress) => {
-            // Calculate the percentage
-            const percentage = Math.floor((progress.loaded / progress.total) * 100);
-            setUploadProgress(percentage);
-          }
+          upsert: false
         });
         
       if (error) {
