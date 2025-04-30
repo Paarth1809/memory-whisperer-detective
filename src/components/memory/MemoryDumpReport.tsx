@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -183,7 +182,7 @@ const MemoryDumpReport: React.FC<MemoryDumpReportProps> = ({ analysisResults }) 
     document.body.appendChild(a);
     a.click();
     setTimeout(() => {
-      URL.revoObjectURL(url);
+      URL.revokeObjectURL(url);
       document.body.removeChild(a);
     }, 100);
   };
