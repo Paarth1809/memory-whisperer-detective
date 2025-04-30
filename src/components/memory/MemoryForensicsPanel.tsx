@@ -8,18 +8,28 @@ import {
   HardDrive, Cpu, Library, Network, ShieldX, Text, Database, 
   Key, Search, Clock, CheckCircle, XCircle, Loader2,
   File, Settings, Globe, KeyRound, Terminal, BarChart2,
-  Puzzle, FileText, Hash, Layers
+  Puzzle, FileText, Hash, Layers, Code, TerminalSquare,
+  ServerCrash
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/hooks/use-toast';
 import { 
   MemoryForensicFeature, 
+  VolatilityPlugin,
   getAllForensicFeatures, 
-  getFeaturesByCategory 
+  getFeaturesByCategory,
+  getAllVolatilityPlugins,
+  getVolatilityPluginsByCategory,
+  generateVolatilityCommand,
+  generateVolatilityPluginOutput
 } from './utils/memoryAnalysisHelpers';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import MemoryDumpReport from './MemoryDumpReport';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Form, FormField, FormItem, FormLabel, FormControl } from '@/components/ui/form';
+import { useForm } from 'react-hook-form';
 
 interface MemoryForensicsPanelProps {
   onAnalysisComplete?: (results: any) => void;
@@ -36,10 +46,43 @@ const MemoryForensicsPanel: React.FC<MemoryForensicsPanelProps> = ({ onAnalysisC
   const [batchAnalysisMode, setBatchAnalysisMode] = useState<boolean>(false);
   const [reportGenerating, setReportGenerating] = useState<boolean>(false);
   const [batchProgress, setBatchProgress] = useState<number>(0);
-  const [analysisResults, setAnalysisResults] = useState<Record<string, string>>({});
+  const [analysisResults, setAnalysisResults] = useState<Record<string, { result: string, completedAt: string }>>({});
+  
+  // Volatility specific states
+  const [activeVolatilityTab, setActiveVolatilityTab] = useState<string>('processes');
+  const [selectedPlugins, setSelectedPlugins] = useState<string[]>([]);
+  const [activePlugin, setActivePlugin] = useState<string | null>(null);
+  const [pluginOutput, setPluginOutput] = useState<string>('');
+  const [volatilityProfile, setVolatilityProfile] = useState<string>("Win10x64_18362");
+  const [isPluginRunning, setIsPluginRunning] = useState<boolean>(false);
+
+  const volatilityForm = useForm({
+    defaultValues: {
+      profile: "Win10x64_18362",
+      dumpPath: "memory_dump.raw",
+      options: ""
+    }
+  });
+
+  const volatilityProfiles = [
+    "Win10x64_18362", "Win10x64_19041", "Win10x64_17763", "Win10x64_16299",
+    "Win7SP1x64", "Win7SP1x86", "Win8SP1x64", "Win2016x64", "WinXPSP2x86"
+  ];
+
+  const volatilityCategories = [
+    { id: "processes", label: "Processes" },
+    { id: "memory", label: "Memory" },
+    { id: "registry", label: "Registry" },
+    { id: "network", label: "Network" },
+    { id: "malware", label: "Malware" },
+    { id: "artifacts", label: "Artifacts" },
+    { id: "kernel", label: "Kernel" }
+  ];
 
   const handleMemoryDumpUpload = (file: File) => {
     setMemoryDumpUploaded(true);
+    volatilityForm.setValue("dumpPath", file.name);
+    
     toast({
       title: "Memory Dump Uploaded",
       description: `${file.name} (${(file.size / (1024 * 1024)).toFixed(2)} MB) uploaded successfully.`,
@@ -66,9 +109,16 @@ const MemoryForensicsPanel: React.FC<MemoryForensicsPanelProps> = ({ onAnalysisC
           setAnalysisInProgress(false);
           setCompletedAnalyses(prev => [...prev, analysisType]);
           
+          const result = analysisType.startsWith('volatility-') 
+            ? generateVolatilityPluginOutput(analysisType.replace('volatility-', '')) 
+            : `Result: ${getFeatureTitle(analysisType)} found 0 critical anomalies.`;
+          
           setAnalysisResults(prev => ({
             ...prev,
-            [analysisType]: `Result: ${getFeatureTitle(analysisType)} found 0 critical anomalies. (Demo output)`
+            [analysisType]: {
+              result,
+              completedAt: new Date().toLocaleString()
+            }
           }));
           
           toast({
@@ -80,7 +130,7 @@ const MemoryForensicsPanel: React.FC<MemoryForensicsPanelProps> = ({ onAnalysisC
             onAnalysisComplete({
               type: analysisType,
               timestamp: new Date(),
-              results: `Mock results for ${analysisType}`
+              results: result
             });
           }
           
@@ -133,10 +183,20 @@ const MemoryForensicsPanel: React.FC<MemoryForensicsPanelProps> = ({ onAnalysisC
         if (progress >= 100) {
           clearInterval(interval);
           setCompletedAnalyses(prev => [...prev, feature]);
+          
+          // Get appropriate result based on feature type
+          const result = feature.startsWith('volatility-') 
+            ? generateVolatilityPluginOutput(feature.replace('volatility-', '')) 
+            : `Result: ${getFeatureTitle(feature)} found 0 critical anomalies.`;
+          
           setAnalysisResults(prev => ({
             ...prev,
-            [feature]: `Result: ${getFeatureTitle(feature)} found 0 critical anomalies. (Demo output)`
+            [feature]: {
+              result,
+              completedAt: new Date().toLocaleString()
+            }
           }));
+          
           featureIndex++;
           setBatchProgress((featureIndex / selectedFeatures.length) * 100);
           setAnalysisInProgress(false);
@@ -146,6 +206,122 @@ const MemoryForensicsPanel: React.FC<MemoryForensicsPanelProps> = ({ onAnalysisC
     };
     
     processNextFeature();
+  };
+
+  const runVolatilityPlugin = (pluginId: string) => {
+    if (isPluginRunning || !memoryDumpUploaded) return;
+    
+    setIsPluginRunning(true);
+    setActivePlugin(pluginId);
+    setPluginOutput('Running plugin, please wait...');
+    
+    const formValues = volatilityForm.getValues();
+    const command = generateVolatilityCommand(
+      pluginId, 
+      formValues.dumpPath, 
+      formValues.profile,
+      // Parse additional options from space-separated string
+      formValues.options.split(' ').reduce((acc, option) => {
+        const [key, value] = option.split('=');
+        if (key && key.trim()) {
+          acc[key.trim()] = value ? value.trim() : '';
+        }
+        return acc;
+      }, {} as Record<string, string>)
+    );
+    
+    toast({
+      title: "Running Volatility Plugin",
+      description: `Executing: ${pluginId}`,
+    });
+    
+    // Simulate plugin execution
+    setTimeout(() => {
+      const output = generateVolatilityPluginOutput(pluginId);
+      setPluginOutput(output);
+      setIsPluginRunning(false);
+      
+      // Add to completed analyses if not already there
+      const analysisKey = `volatility-${pluginId}`;
+      if (!completedAnalyses.includes(analysisKey)) {
+        setCompletedAnalyses(prev => [...prev, analysisKey]);
+        setAnalysisResults(prev => ({
+          ...prev,
+          [analysisKey]: {
+            result: output,
+            completedAt: new Date().toLocaleString()
+          }
+        }));
+      }
+      
+      toast({
+        title: "Plugin Execution Complete",
+        description: `${pluginId} completed successfully.`,
+      });
+    }, 2000);
+  };
+
+  const togglePluginSelection = (pluginId: string) => {
+    setSelectedPlugins(prev => {
+      if (prev.includes(pluginId)) {
+        return prev.filter(id => id !== pluginId);
+      } else {
+        return [...prev, pluginId];
+      }
+    });
+  };
+
+  const runSelectedVolatilityPlugins = () => {
+    if (selectedPlugins.length === 0 || !memoryDumpUploaded) {
+      toast({
+        title: "No Plugins Selected",
+        description: "Please select at least one Volatility plugin.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    toast({
+      title: "Batch Plugin Execution",
+      description: `Running ${selectedPlugins.length} Volatility plugins.`,
+    });
+    
+    let pluginIndex = 0;
+    const runNextPlugin = () => {
+      if (pluginIndex >= selectedPlugins.length) {
+        toast({
+          title: "Batch Execution Complete",
+          description: `All ${selectedPlugins.length} plugins executed successfully.`,
+        });
+        return;
+      }
+      
+      const plugin = selectedPlugins[pluginIndex];
+      setActivePlugin(plugin);
+      setIsPluginRunning(true);
+      
+      setTimeout(() => {
+        const output = generateVolatilityPluginOutput(plugin);
+        const analysisKey = `volatility-${plugin}`;
+        
+        if (!completedAnalyses.includes(analysisKey)) {
+          setCompletedAnalyses(prev => [...prev, analysisKey]);
+          setAnalysisResults(prev => ({
+            ...prev,
+            [analysisKey]: {
+              result: output,
+              completedAt: new Date().toLocaleString()
+            }
+          }));
+        }
+        
+        pluginIndex++;
+        setIsPluginRunning(false);
+        runNextPlugin();
+      }, 1500);
+    };
+    
+    runNextPlugin();
   };
 
   const toggleFeatureSelection = (featureId: string) => {
@@ -177,8 +353,6 @@ const MemoryForensicsPanel: React.FC<MemoryForensicsPanelProps> = ({ onAnalysisC
         title: "Report Generated",
         description: "Forensic analysis report is ready for download.",
       });
-      
-      // In a real implementation, this would generate and offer download of an actual report
     }, 2000);
   };
 
@@ -202,11 +376,14 @@ const MemoryForensicsPanel: React.FC<MemoryForensicsPanelProps> = ({ onAnalysisC
       "globe": <Globe size={18} className="text-blue-500" />,
       "key-round": <KeyRound size={18} className="text-amber-300" />,
       "terminal": <Terminal size={18} className="text-lime-400" />,
+      "terminal-square": <TerminalSquare size={18} className="text-lime-400" />,
       "bar-chart-2": <BarChart2 size={18} className="text-pink-400" />,
       "puzzle": <Puzzle size={18} className="text-violet-400" />,
       "file-text": <FileText size={18} className="text-emerald-400" />,
       "hash": <Hash size={18} className="text-fuchsia-400" />,
-      "layers": <Layers size={18} className="text-orange-400" />
+      "layers": <Layers size={18} className="text-orange-400" />,
+      "code": <Code size={18} className="text-sky-400" />,
+      "server": <ServerCrash size={18} className="text-rose-400" />
     };
     
     return iconMap[iconName] || <HardDrive size={18} className="text-blue-200" />;
@@ -263,6 +440,57 @@ const MemoryForensicsPanel: React.FC<MemoryForensicsPanelProps> = ({ onAnalysisC
     );
   };
 
+  const renderVolatilityPluginCard = (plugin: VolatilityPlugin) => {
+    const isSelected = selectedPlugins.includes(plugin.id);
+    const isRunning = isPluginRunning && activePlugin === plugin.id;
+    const isCompleted = completedAnalyses.includes(`volatility-${plugin.id}`);
+    
+    return (
+      <Card className={`bg-cyber-dark border ${isSelected ? 'border-cyber-blue' : 'border-cyber-blue/30'} hover:border-cyber-blue/60 transition-all`}>
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between mb-1">
+            <CardTitle className="text-cyber-blue text-base flex items-center gap-2">
+              <TerminalSquare size={16} className="text-cyber-blue" />
+              {plugin.name}
+            </CardTitle>
+            <div className="flex items-center gap-2">
+              {isCompleted && <CheckCircle size={16} className="text-green-400" />}
+              <Checkbox 
+                checked={isSelected}
+                onCheckedChange={() => togglePluginSelection(plugin.id)}
+                className="border-cyber-blue/50 data-[state=checked]:bg-cyber-blue data-[state=checked]:text-cyber-dark"
+              />
+            </div>
+          </div>
+          <CardDescription className="text-xs">{plugin.description}</CardDescription>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <div className="text-xs text-muted-foreground mb-2">
+            <span className="inline-block mr-3">
+              <Badge variant="outline" className="bg-cyber-blue/5 text-cyber-blue/80 border-cyber-blue/30 text-[10px]">
+                {plugin.compatibility.join(", ")}
+              </Badge>
+            </span>
+          </div>
+          {isRunning ? (
+            <div className="flex items-center justify-center py-1">
+              <Loader2 size={16} className="animate-spin text-cyber-blue mr-2" />
+              <span className="text-xs">Running...</span>
+            </div>
+          ) : (
+            <Button 
+              onClick={() => runVolatilityPlugin(plugin.id)} 
+              className="w-full bg-cyber-blue/20 text-cyber-blue hover:bg-cyber-blue/30 text-xs h-7 py-0"
+              disabled={!memoryDumpUploaded || isRunning}
+            >
+              Run Plugin
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
+
   const renderFeaturesByCategory = (category: string, title: string) => {
     const features = getFeaturesByCategory(category);
     
@@ -273,6 +501,21 @@ const MemoryForensicsPanel: React.FC<MemoryForensicsPanelProps> = ({ onAnalysisC
         <h3 className="text-lg font-medium mb-3 text-cyber-blue">{title}</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {features.map(feature => renderFeatureCard(feature))}
+        </div>
+      </div>
+    );
+  };
+
+  const renderVolatilityPluginsByCategory = (category: string, title: string) => {
+    const plugins = getVolatilityPluginsByCategory(category);
+    
+    if (plugins.length === 0) return null;
+    
+    return (
+      <div className="space-y-4 mb-6">
+        <h3 className="text-base font-medium text-cyber-blue">{title}</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {plugins.map(plugin => renderVolatilityPluginCard(plugin))}
         </div>
       </div>
     );
@@ -311,7 +554,7 @@ const MemoryForensicsPanel: React.FC<MemoryForensicsPanelProps> = ({ onAnalysisC
           onValueChange={setActiveTab}
           className="w-full"
         >
-          <TabsList className="w-full grid grid-cols-4 mb-4 bg-cyber-darker">
+          <TabsList className="w-full grid grid-cols-5 mb-4 bg-cyber-darker">
             <TabsTrigger value="memory-dump" className="data-[state=active]:bg-cyber-blue data-[state=active]:text-cyber-dark">
               Memory Dump
             </TabsTrigger>
@@ -323,6 +566,9 @@ const MemoryForensicsPanel: React.FC<MemoryForensicsPanelProps> = ({ onAnalysisC
             </TabsTrigger>
             <TabsTrigger value="utilities" className="data-[state=active]:bg-cyber-blue data-[state=active]:text-cyber-dark">
               Utilities
+            </TabsTrigger>
+            <TabsTrigger value="volatility" className="data-[state=active]:bg-cyber-blue data-[state=active]:text-cyber-dark">
+              Volatility
             </TabsTrigger>
           </TabsList>
           
@@ -384,6 +630,145 @@ const MemoryForensicsPanel: React.FC<MemoryForensicsPanelProps> = ({ onAnalysisC
           <TabsContent value="utilities" className="mt-0">
             {renderFeaturesByCategory("utilities", "Utility Tools")}
           </TabsContent>
+          
+          <TabsContent value="volatility" className="mt-0">
+            <Card className="border border-cyber-blue/20 bg-cyber-darker mb-4">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-cyber-blue text-lg">Volatility Framework Configuration</CardTitle>
+                <CardDescription>Configure Volatility parameters for memory analysis</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Form {...volatilityForm}>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <FormField
+                      control={volatilityForm.control}
+                      name="profile"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-cyber-blue">Memory Profile</FormLabel>
+                          <Select 
+                            onValueChange={field.onChange} 
+                            defaultValue={field.value}
+                            value={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger className="bg-cyber-dark border-cyber-blue/30">
+                                <SelectValue placeholder="Select OS profile" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent className="bg-cyber-dark border-cyber-blue/30">
+                              <SelectGroup>
+                                {volatilityProfiles.map(profile => (
+                                  <SelectItem key={profile} value={profile}>
+                                    {profile}
+                                  </SelectItem>
+                                ))}
+                              </SelectGroup>
+                            </SelectContent>
+                          </Select>
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={volatilityForm.control}
+                      name="dumpPath"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-cyber-blue">Memory Dump Path</FormLabel>
+                          <FormControl>
+                            <Input 
+                              {...field} 
+                              className="bg-cyber-dark border-cyber-blue/30"
+                              readOnly={true}
+                              placeholder="Upload memory dump first"
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={volatilityForm.control}
+                      name="options"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-cyber-blue">Additional Options</FormLabel>
+                          <FormControl>
+                            <Input 
+                              {...field} 
+                              className="bg-cyber-dark border-cyber-blue/30"
+                              placeholder="option1=value1 option2"
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  
+                  {selectedPlugins.length > 0 && (
+                    <div className="mt-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium">Selected Plugins:</span>
+                        <Badge variant="outline" className="bg-cyber-blue/10">
+                          {selectedPlugins.length} plugins
+                        </Badge>
+                      </div>
+                      <Button
+                        onClick={runSelectedVolatilityPlugins}
+                        className="w-full bg-cyber-blue/20 text-cyber-blue hover:bg-cyber-blue/30"
+                        disabled={!memoryDumpUploaded || isPluginRunning}
+                      >
+                        Run Selected Plugins
+                      </Button>
+                    </div>
+                  )}
+                </Form>
+              </CardContent>
+            </Card>
+            
+            <Tabs 
+              value={activeVolatilityTab} 
+              onValueChange={setActiveVolatilityTab} 
+              className="w-full"
+            >
+              <TabsList className="w-full grid grid-cols-7 mb-4 bg-cyber-darker">
+                {volatilityCategories.map(cat => (
+                  <TabsTrigger 
+                    key={cat.id}
+                    value={cat.id} 
+                    className="text-xs md:text-sm data-[state=active]:bg-cyber-blue data-[state=active]:text-cyber-dark"
+                  >
+                    {cat.label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+              
+              {volatilityCategories.map(cat => (
+                <TabsContent key={cat.id} value={cat.id} className="mt-0">
+                  {renderVolatilityPluginsByCategory(cat.id, `${cat.label} Analysis Plugins`)}
+                </TabsContent>
+              ))}
+            </Tabs>
+            
+            {activePlugin && (
+              <Card className="mt-4 border border-cyber-blue/20 bg-cyber-darker">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-cyber-blue">Plugin Output: {activePlugin}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <pre className="bg-cyber-dark p-3 rounded-md overflow-x-auto text-xs font-mono border border-cyber-blue/10 h-[300px] overflow-y-auto whitespace-pre">
+                    {isPluginRunning ? (
+                      <div className="flex items-center justify-center h-full">
+                        <Loader2 size={24} className="animate-spin mr-2 text-cyber-blue" />
+                        <span>Running Volatility plugin...</span>
+                      </div>
+                    ) : pluginOutput || 'No output available. Run the plugin to see results.'}
+                  </pre>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
         </Tabs>
         
         {completedAnalyses.length > 0 && (
@@ -404,14 +789,20 @@ const MemoryForensicsPanel: React.FC<MemoryForensicsPanelProps> = ({ onAnalysisC
                       <div className="flex items-center justify-between text-sm">
                         <span className="flex items-center gap-2">
                           <CheckCircle size={14} className="text-green-400" />
-                          {getFeatureTitle(analysis)}
+                          {analysis.startsWith('volatility-') 
+                            ? `Volatility: ${analysis.replace('volatility-', '')}`
+                            : getFeatureTitle(analysis)}
                         </span>
                         <span className="text-xs text-muted-foreground">
-                          {new Date().toLocaleTimeString()}
+                          {analysisResults[analysis]?.completedAt || new Date().toLocaleTimeString()}
                         </span>
                       </div>
                       <div className="text-xs mt-2 text-cyber-blue/90">
-                        {analysisResults[analysis] ?? "No result."}
+                        {analysisResults[analysis]
+                          ? (typeof analysisResults[analysis] === 'string' 
+                            ? analysisResults[analysis] 
+                            : analysisResults[analysis].result)
+                          : "No result."}
                       </div>
                     </div>
                   ))}

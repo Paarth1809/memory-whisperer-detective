@@ -15,27 +15,63 @@ interface MemoryDumpReportProps {
 }
 
 function getFeatureFormatted(type: string) {
+  if (type.startsWith('volatility-')) {
+    return `Volatility: ${type.replace('volatility-', '').replace(/_/g, ' ').replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}`;
+  }
   return type.replace(/_/g, ' ').replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 }
 
 function formatReportForDownload(analysisResults: Record<string, string | AnalysisCompletionData>) {
   let txt = '==== Memory Dump Forensics Report ====\n';
   txt += `Generated: ${new Date().toLocaleString()}\n\n`;
-  txt += 'Analysis Results:\n';
-
-  Object.entries(analysisResults).forEach(([type, resultObj], idx) => {
-    let featureTitle = getFeatureFormatted(type);
-    let result = typeof resultObj === 'string' ? resultObj : resultObj.result;
-    let completedAt = typeof resultObj === 'string'
-      ? undefined
-      : resultObj.completedAt
-        ? `Completed at: ${resultObj.completedAt}`
-        : undefined;
-
-    txt += `\n${idx + 1}. ${featureTitle}\n`;
-    if (completedAt) txt += `   ${completedAt}\n`;
-    txt += `   Details: ${result}\n`;
+  
+  // Separate standard analysis and volatility results
+  const volatilityResults: [string, string | AnalysisCompletionData][] = [];
+  const standardResults: [string, string | AnalysisCompletionData][] = [];
+  
+  Object.entries(analysisResults).forEach(([type, result]) => {
+    if (type.startsWith('volatility-')) {
+      volatilityResults.push([type, result]);
+    } else {
+      standardResults.push([type, result]);
+    }
   });
+  
+  if (standardResults.length > 0) {
+    txt += '=== STANDARD ANALYSIS RESULTS ===\n\n';
+    standardResults.forEach(([type, resultObj], idx) => {
+      let featureTitle = getFeatureFormatted(type);
+      let result = typeof resultObj === 'string' ? resultObj : resultObj.result;
+      let completedAt = typeof resultObj === 'string'
+        ? undefined
+        : resultObj.completedAt
+          ? `Completed at: ${resultObj.completedAt}`
+          : undefined;
+
+      txt += `\n${idx + 1}. ${featureTitle}\n`;
+      if (completedAt) txt += `   ${completedAt}\n`;
+      txt += `   Details: ${result}\n`;
+    });
+  }
+  
+  if (volatilityResults.length > 0) {
+    txt += '\n\n=== VOLATILITY FRAMEWORK ANALYSIS RESULTS ===\n\n';
+    volatilityResults.forEach(([type, resultObj], idx) => {
+      let pluginName = type.replace('volatility-', '');
+      let featureTitle = getFeatureFormatted(type);
+      let result = typeof resultObj === 'string' ? resultObj : resultObj.result;
+      let completedAt = typeof resultObj === 'string'
+        ? undefined
+        : resultObj.completedAt
+          ? `Completed at: ${resultObj.completedAt}`
+          : undefined;
+
+      txt += `\n${idx + 1}. ${featureTitle}\n`;
+      if (completedAt) txt += `   ${completedAt}\n`;
+      txt += `   Command: volatility -f memory_dump.raw --profile=Win10x64_18362 ${pluginName}\n`;
+      txt += `   Output:\n\n${result}\n`;
+    });
+  }
 
   txt += '\n=====================================\n';
   return txt;
@@ -65,11 +101,39 @@ function getRealisticResult(featureType: string) {
     'cross-platform-analysis': 'Successfully analyzed Windows memory dump. OS fingerprinting identified Windows 10 21H2 (build 19044.2965).',
     'volatility': 'Used Volatility Framework to analyze memory structures. Located hidden driver in kernel space. Found evidence of rootkit techniques.',
     'flash': 'Located Flash artifact indicators in browser process memory. Extracted ActionScript objects with suspicious behaviors.',
-    'flask_sqlalchemy': 'Identified Python Flask application with SQLAlchemy ORM. Recovered database queries with sensitive information exposure. Located hardcoded credentials in ORM models.'
+    'flask_sqlalchemy': 'Identified Python Flask application with SQLAlchemy ORM. Recovered database queries with sensitive information exposure. Located hardcoded credentials in ORM models.',
+    'volatility-process': 'Found 32 processes running at time of memory capture. Identified 3 suspicious processes using advanced process analysis techniques.',
+    'volatility-memory': 'Located executable memory regions hidden in legitimate processes. Located shellcode injection in process with PID 1338.',
+    'volatility-registry': 'Extracted and analyzed registry hives. Located persistence mechanisms established via Run keys and services.',
+    'volatility-network': 'Mapped complete network activity. Discovered covert channel communication to 45.77.123.18:443.',
+    'volatility-malware': 'Detected reflective DLL loading in process memory. Found obfuscated shellcode in unexpected memory regions.',
+    'volatility-artifacts': 'Retrieved browser history, clipboard contents, and recently accessed files from memory.',
+    'volatility-kernel': 'Identified hidden kernel module and potential DKOM (Direct Kernel Object Manipulation) attack.',
   };
 
+  // If it's a standard volatility plugin, provide more detailed analysis
+  if (featureType.startsWith('volatility-')) {
+    const pluginName = featureType.replace('volatility-', '');
+    
+    if (pluginName === 'pslist' || pluginName === 'psscan' || pluginName === 'pstree') {
+      return 'Analyzed running processes at time of memory capture. Found evidence of process hollowing in PID 1339 (svchost.exe running from non-standard location). Suspicious PowerShell process (PID 1338) with unusual flags and parent process.';
+    }
+    
+    if (pluginName === 'malfind' || pluginName === 'yarascan') {
+      return 'Located injected code in memory. Found signatures matching known malware families including a potential Cobalt Strike beacon in svchost.exe (PID 1339) and credential harvesting code in powershell.exe (PID 1338).';
+    }
+    
+    if (pluginName === 'netscan' || pluginName === 'connections') {
+      return 'Identified suspicious network connections to IPs 45.77.123.18:443 and 103.195.103.66:8080 from suspicious processes. These connections exhibit characteristics of command and control traffic.';
+    }
+    
+    if (pluginName === 'hivelist' || pluginName === 'printkey') {
+      return 'Extracted registry hives with evidence of persistence mechanisms. Found autorun entries for suspicious executables and modified system configurations to evade detection.';
+    }
+  }
+  
   return results[featureType as keyof typeof results] || 
-    `Analysis complete. No significant findings for ${getFeatureFormatted(featureType)}.`;
+    `Analysis complete. Found potential anomalies in ${getFeatureFormatted(featureType)}.`;
 }
 
 const MemoryDumpReport: React.FC<MemoryDumpReportProps> = ({ analysisResults }) => {
@@ -119,10 +183,14 @@ const MemoryDumpReport: React.FC<MemoryDumpReportProps> = ({ analysisResults }) 
     document.body.appendChild(a);
     a.click();
     setTimeout(() => {
-      URL.revokeObjectURL(url);
+      URL.revoObjectURL(url);
       document.body.removeChild(a);
     }, 100);
   };
+
+  // Separate standard and volatility analyses
+  const standardAnalyses = analysisRows.filter(row => !row.type.startsWith('volatility-'));
+  const volatilityAnalyses = analysisRows.filter(row => row.type.startsWith('volatility-'));
 
   return (
     <Card className="border border-cyber-blue/20 bg-cyber-darker mt-8">
@@ -142,25 +210,58 @@ const MemoryDumpReport: React.FC<MemoryDumpReportProps> = ({ analysisResults }) 
         </div>
       </CardHeader>
       <CardContent>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Feature</TableHead>
-                <TableHead>Completion Time</TableHead>
-                <TableHead>Result Details</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {analysisRows.map(({ type, result, completedAt }) => (
-                <TableRow key={type}>
-                  <TableCell className="font-medium text-cyber-blue">{getFeatureFormatted(type)}</TableCell>
-                  <TableCell className="text-sm">{completedAt || '—'}</TableCell>
-                  <TableCell>{result}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+        <div className="space-y-6">
+          {standardAnalyses.length > 0 && (
+            <div>
+              <h3 className="text-base font-medium mb-3 text-cyber-blue">Standard Analysis Results</h3>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Feature</TableHead>
+                      <TableHead>Completion Time</TableHead>
+                      <TableHead>Result Details</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {standardAnalyses.map(({ type, result, completedAt }) => (
+                      <TableRow key={type}>
+                        <TableCell className="font-medium text-cyber-blue">{getFeatureFormatted(type)}</TableCell>
+                        <TableCell className="text-sm">{completedAt || '—'}</TableCell>
+                        <TableCell>{result}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
+          
+          {volatilityAnalyses.length > 0 && (
+            <div>
+              <h3 className="text-base font-medium mb-3 text-cyber-blue">Volatility Framework Analysis Results</h3>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Plugin</TableHead>
+                      <TableHead>Execution Time</TableHead>
+                      <TableHead>Findings</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {volatilityAnalyses.map(({ type, result, completedAt }) => (
+                      <TableRow key={type}>
+                        <TableCell className="font-medium text-cyber-blue">{getFeatureFormatted(type)}</TableCell>
+                        <TableCell className="text-sm">{completedAt || '—'}</TableCell>
+                        <TableCell>{result}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
