@@ -47,7 +47,6 @@ const MemoryForensicsPanel: React.FC<MemoryForensicsPanelProps> = ({ onAnalysisC
   const [reportGenerating, setReportGenerating] = useState<boolean>(false);
   const [batchProgress, setBatchProgress] = useState<number>(0);
   const [analysisResults, setAnalysisResults] = useState<Record<string, { result: string, completedAt: string }>>({});
-  const [uploadedFileInfo, setUploadedFileInfo] = useState<{url: string, name: string, size: number} | null>(null);
   
   // Volatility specific states
   const [activeVolatilityTab, setActiveVolatilityTab] = useState<string>('processes');
@@ -80,19 +79,13 @@ const MemoryForensicsPanel: React.FC<MemoryForensicsPanelProps> = ({ onAnalysisC
     { id: "kernel", label: "Kernel" }
   ];
 
-  const handleMemoryDumpUpload = (fileUrl: string, fileName: string, fileSize: number) => {
+  const handleMemoryDumpUpload = (file: File) => {
     setMemoryDumpUploaded(true);
-    setUploadedFileInfo({
-      url: fileUrl,
-      name: fileName,
-      size: fileSize
-    });
-    
-    volatilityForm.setValue("dumpPath", fileName);
+    volatilityForm.setValue("dumpPath", file.name);
     
     toast({
       title: "Memory Dump Uploaded",
-      description: `${fileName} (${(fileSize / (1024 * 1024)).toFixed(2)} MB) uploaded successfully.`,
+      description: `${file.name} (${(file.size / (1024 * 1024)).toFixed(2)} MB) uploaded successfully.`,
     });
   };
 

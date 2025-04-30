@@ -5,10 +5,9 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Progress } from '@/components/ui/progress';
 import { toast } from '@/components/ui/use-toast';
 import { Upload, FileType } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 
 interface UploadMemoryDumpProps {
-  onUploadComplete: (fileUrl: string, fileName: string, fileSize: number) => void;
+  onUploadComplete: (file: File) => void;
 }
 
 const UploadMemoryDump: React.FC<UploadMemoryDumpProps> = ({ onUploadComplete }) => {
@@ -23,7 +22,7 @@ const UploadMemoryDump: React.FC<UploadMemoryDumpProps> = ({ onUploadComplete })
     }
   };
 
-  const handleUpload = async () => {
+  const handleUpload = () => {
     if (!selectedFile) {
       toast({
         title: "No file selected",
@@ -35,55 +34,22 @@ const UploadMemoryDump: React.FC<UploadMemoryDumpProps> = ({ onUploadComplete })
 
     setIsUploading(true);
     
-    try {
-      // Create a unique file path with timestamp to prevent collisions
-      const timestamp = new Date().getTime();
-      const filePath = `${timestamp}_${selectedFile.name}`;
+    // Simulate upload progress
+    let progress = 0;
+    const interval = setInterval(() => {
+      progress += 10;
+      setUploadProgress(progress);
       
-      // Set up an XMLHttpRequest to track upload progress
-      const xhr = new XMLHttpRequest();
-      xhr.upload.addEventListener('progress', (event) => {
-        if (event.lengthComputable) {
-          const percentage = Math.floor((event.loaded / event.total) * 100);
-          setUploadProgress(percentage);
-        }
-      });
-
-      // Upload file to Supabase Storage
-      const { data, error } = await supabase.storage
-        .from('memory_dumps')
-        .upload(filePath, selectedFile, {
-          cacheControl: '3600',
-          upsert: false
+      if (progress >= 100) {
+        clearInterval(interval);
+        setIsUploading(false);
+        toast({
+          title: "Upload complete",
+          description: "Memory dump ready for analysis."
         });
-        
-      if (error) {
-        throw error;
+        onUploadComplete(selectedFile);
       }
-      
-      // Get the public URL for the uploaded file
-      const { data: { publicUrl } } = supabase.storage
-        .from('memory_dumps')
-        .getPublicUrl(filePath);
-      
-      toast({
-        title: "Upload complete",
-        description: "Memory dump ready for analysis."
-      });
-      
-      // Pass the file URL, name and size to the parent component
-      onUploadComplete(publicUrl, selectedFile.name, selectedFile.size);
-      
-    } catch (error: any) {
-      console.error("Error uploading file:", error);
-      toast({
-        title: "Upload failed",
-        description: error.message || "There was an error uploading the file.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsUploading(false);
-    }
+    }, 300);
   };
 
   return (
