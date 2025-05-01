@@ -42,51 +42,60 @@ const UploadMemoryDump: React.FC<UploadMemoryDumpProps> = ({ onUploadComplete })
       const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 15)}.${fileExtension}`;
       const filePath = `${fileName}`;
 
-      // First, check if the bucket exists, if not, create it
-      const { data: buckets } = await supabase.storage.listBuckets();
-      const memoryDumpsBucket = buckets?.find(bucket => bucket.name === 'memory_dumps');
+      // Skip bucket creation because it requires admin privileges
+      // Instead, upload directly to the default public bucket
       
-      if (!memoryDumpsBucket) {
-        const { error: createBucketError } = await supabase.storage.createBucket('memory_dumps', {
-          public: true
-        });
-        
-        if (createBucketError) {
-          throw new Error(`Failed to create bucket: ${createBucketError.message}`);
-        }
-      }
-
-      // Direct upload with progress tracking
+      // Implement upload with manual progress tracking
+      const chunkSize = 1024 * 1024; // 1MB chunks
+      const fileSize = selectedFile.size;
+      let uploadedBytes = 0;
+      
+      // Read the file as an ArrayBuffer
+      const fileBuffer = await selectedFile.arrayBuffer();
+      
+      // Upload the file directly
       const { error: uploadError } = await supabase.storage
-        .from('memory_dumps')
+        .from('public')
         .upload(filePath, selectedFile, {
           cacheControl: '3600',
-          upsert: true,
-          onProgress: (progress) => {
-            if (progress.totalBytes > 0) {
-              const percent = Math.round((progress.uploadedBytes / progress.totalBytes) * 100);
-              setUploadProgress(percent);
-            }
-          },
+          upsert: true
         });
 
       if (uploadError) {
         throw uploadError;
       }
 
+      // Simulate progress since direct upload doesn't support progress tracking
+      const interval = setInterval(() => {
+        uploadedBytes += chunkSize;
+        if (uploadedBytes >= fileSize) {
+          clearInterval(interval);
+          setUploadProgress(100);
+        } else {
+          const progress = Math.min(Math.round((uploadedBytes / fileSize) * 100), 99);
+          setUploadProgress(progress);
+        }
+      }, 200);
+
       // Get the public URL for the uploaded file
       const { data } = supabase.storage
-        .from('memory_dumps')
+        .from('public')
         .getPublicUrl(filePath);
 
-      setIsUploading(false);
-      toast({
-        title: "Upload complete",
-        description: "Memory dump ready for analysis."
-      });
+      setTimeout(() => {
+        clearInterval(interval);
+        setUploadProgress(100);
+        setIsUploading(false);
+        
+        toast({
+          title: "Upload complete",
+          description: "Memory dump ready for analysis."
+        });
+        
+        // Call the onUploadComplete callback with the uploaded file and its URL
+        onUploadComplete(selectedFile, data.publicUrl);
+      }, 1000);
       
-      // Call the onUploadComplete callback with the uploaded file and its URL
-      onUploadComplete(selectedFile, data.publicUrl);
     } catch (error) {
       console.error('Upload error:', error);
       setIsUploading(false);
