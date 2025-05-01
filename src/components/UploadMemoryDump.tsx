@@ -3,11 +3,12 @@ import React, { ChangeEvent, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from '@/hooks/use-toast';
 import { Upload, FileType } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface UploadMemoryDumpProps {
-  onUploadComplete: (file: File) => void;
+  onUploadComplete: (file: File, fileUrl: string) => void;
 }
 
 const UploadMemoryDump: React.FC<UploadMemoryDumpProps> = ({ onUploadComplete }) => {
@@ -22,7 +23,7 @@ const UploadMemoryDump: React.FC<UploadMemoryDumpProps> = ({ onUploadComplete })
     }
   };
 
-  const handleUpload = () => {
+  const handleUpload = async () => {
     if (!selectedFile) {
       toast({
         title: "No file selected",
@@ -34,22 +35,84 @@ const UploadMemoryDump: React.FC<UploadMemoryDumpProps> = ({ onUploadComplete })
 
     setIsUploading(true);
     
-    // Simulate upload progress
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += 10;
-      setUploadProgress(progress);
+    try {
+      // Create a unique filename to prevent collisions
+      const fileExtension = selectedFile.name.split('.').pop();
+      const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 15)}.${fileExtension}`;
+      const filePath = `${fileName}`;
+
+      // Use upload with XHR to track upload progress
+      const xhr = new XMLHttpRequest();
       
-      if (progress >= 100) {
-        clearInterval(interval);
-        setIsUploading(false);
-        toast({
-          title: "Upload complete",
-          description: "Memory dump ready for analysis."
-        });
-        onUploadComplete(selectedFile);
-      }
-    }, 300);
+      // Set up progress tracking
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const percentComplete = Math.round((event.loaded / event.total) * 100);
+          setUploadProgress(percentComplete);
+        }
+      };
+      
+      // Create a Promise to handle the XHR upload
+      const uploadPromise = new Promise<string>((resolve, reject) => {
+        xhr.onload = async () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            // Get the file URL from Supabase
+            const { data } = supabase.storage
+              .from('memory_dumps')
+              .getPublicUrl(filePath);
+            
+            resolve(data.publicUrl);
+          } else {
+            reject(new Error('Upload failed'));
+          }
+        };
+        
+        xhr.onerror = () => {
+          reject(new Error('Network error'));
+        };
+        
+        // Get a signed URL for the XHR upload
+        const getUploadUrl = async () => {
+          const { data, error } = await supabase.storage
+            .from('memory_dumps')
+            .createSignedUploadUrl(filePath);
+          
+          if (error) {
+            throw error;
+          }
+          
+          return data;
+        };
+        
+        // Start the XHR upload
+        getUploadUrl().then(({ signedUrl, token }) => {
+          xhr.open('PUT', signedUrl);
+          xhr.setRequestHeader('Content-Type', selectedFile.type);
+          xhr.setRequestHeader('x-upsert', 'true');
+          xhr.send(selectedFile);
+        }).catch(reject);
+      });
+      
+      // Wait for the upload to complete
+      const publicUrl = await uploadPromise;
+      
+      setIsUploading(false);
+      toast({
+        title: "Upload complete",
+        description: "Memory dump ready for analysis."
+      });
+      
+      // Call the onUploadComplete callback with the uploaded file and its URL
+      onUploadComplete(selectedFile, publicUrl);
+    } catch (error) {
+      console.error('Upload error:', error);
+      setIsUploading(false);
+      toast({
+        title: "Upload failed",
+        description: error instanceof Error ? error.message : "An unknown error occurred",
+        variant: "destructive"
+      });
+    }
   };
 
   return (

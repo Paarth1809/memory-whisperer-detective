@@ -3,6 +3,7 @@ import React from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { FileText, Download } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
 
 // Extend to accept completion times
 interface AnalysisCompletionData {
@@ -183,7 +184,7 @@ const MemoryDumpReport: React.FC<MemoryDumpReportProps> = ({ analysisResults }) 
     document.body.appendChild(a);
     a.click();
     setTimeout(() => {
-      URL.revoObjectURL(url);
+      URL.revokeObjectURL(url);
       document.body.removeChild(a);
     }, 100);
   };
