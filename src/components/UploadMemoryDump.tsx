@@ -34,6 +34,7 @@ const UploadMemoryDump: React.FC<UploadMemoryDumpProps> = ({ onUploadComplete })
     }
 
     setIsUploading(true);
+    setUploadProgress(0);
     
     try {
       // Create a unique filename to prevent collisions
@@ -41,61 +42,43 @@ const UploadMemoryDump: React.FC<UploadMemoryDumpProps> = ({ onUploadComplete })
       const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 15)}.${fileExtension}`;
       const filePath = `${fileName}`;
 
-      // Use upload with XHR to track upload progress
-      const xhr = new XMLHttpRequest();
+      // First, check if the bucket exists, if not, create it
+      const { data: buckets } = await supabase.storage.listBuckets();
+      const memoryDumpsBucket = buckets?.find(bucket => bucket.name === 'memory_dumps');
       
-      // Set up progress tracking
-      xhr.upload.onprogress = (event) => {
-        if (event.lengthComputable) {
-          const percentComplete = Math.round((event.loaded / event.total) * 100);
-          setUploadProgress(percentComplete);
+      if (!memoryDumpsBucket) {
+        const { error: createBucketError } = await supabase.storage.createBucket('memory_dumps', {
+          public: true
+        });
+        
+        if (createBucketError) {
+          throw new Error(`Failed to create bucket: ${createBucketError.message}`);
         }
-      };
-      
-      // Create a Promise to handle the XHR upload
-      const uploadPromise = new Promise<string>((resolve, reject) => {
-        xhr.onload = async () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            // Get the file URL from Supabase
-            const { data } = supabase.storage
-              .from('memory_dumps')
-              .getPublicUrl(filePath);
-            
-            resolve(data.publicUrl);
-          } else {
-            reject(new Error('Upload failed'));
-          }
-        };
-        
-        xhr.onerror = () => {
-          reject(new Error('Network error'));
-        };
-        
-        // Get a signed URL for the XHR upload
-        const getUploadUrl = async () => {
-          const { data, error } = await supabase.storage
-            .from('memory_dumps')
-            .createSignedUploadUrl(filePath);
-          
-          if (error) {
-            throw error;
-          }
-          
-          return data;
-        };
-        
-        // Start the XHR upload
-        getUploadUrl().then(({ signedUrl, token }) => {
-          xhr.open('PUT', signedUrl);
-          xhr.setRequestHeader('Content-Type', selectedFile.type);
-          xhr.setRequestHeader('x-upsert', 'true');
-          xhr.send(selectedFile);
-        }).catch(reject);
-      });
-      
-      // Wait for the upload to complete
-      const publicUrl = await uploadPromise;
-      
+      }
+
+      // Direct upload with progress tracking
+      const { error: uploadError } = await supabase.storage
+        .from('memory_dumps')
+        .upload(filePath, selectedFile, {
+          cacheControl: '3600',
+          upsert: true,
+          onProgress: (progress) => {
+            if (progress.totalBytes > 0) {
+              const percent = Math.round((progress.uploadedBytes / progress.totalBytes) * 100);
+              setUploadProgress(percent);
+            }
+          },
+        });
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      // Get the public URL for the uploaded file
+      const { data } = supabase.storage
+        .from('memory_dumps')
+        .getPublicUrl(filePath);
+
       setIsUploading(false);
       toast({
         title: "Upload complete",
@@ -103,7 +86,7 @@ const UploadMemoryDump: React.FC<UploadMemoryDumpProps> = ({ onUploadComplete })
       });
       
       // Call the onUploadComplete callback with the uploaded file and its URL
-      onUploadComplete(selectedFile, publicUrl);
+      onUploadComplete(selectedFile, data.publicUrl);
     } catch (error) {
       console.error('Upload error:', error);
       setIsUploading(false);
