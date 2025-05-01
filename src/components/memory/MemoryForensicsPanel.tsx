@@ -38,8 +38,6 @@ interface MemoryForensicsPanelProps {
 const MemoryForensicsPanel: React.FC<MemoryForensicsPanelProps> = ({ onAnalysisComplete }) => {
   const [activeTab, setActiveTab] = useState<string>('memory-dump');
   const [memoryDumpUploaded, setMemoryDumpUploaded] = useState<boolean>(false);
-  const [memoryDumpFile, setMemoryDumpFile] = useState<File | null>(null);
-  const [memoryDumpUrl, setMemoryDumpUrl] = useState<string>('');
   const [analysisInProgress, setAnalysisInProgress] = useState<boolean>(false);
   const [currentAnalysisType, setCurrentAnalysisType] = useState<string>('');
   const [analysisProgress, setAnalysisProgress] = useState<number>(0);
@@ -81,19 +79,14 @@ const MemoryForensicsPanel: React.FC<MemoryForensicsPanelProps> = ({ onAnalysisC
     { id: "kernel", label: "Kernel" }
   ];
 
-  const handleMemoryDumpUpload = (file: File, fileUrl: string) => {
+  const handleMemoryDumpUpload = (file: File) => {
     setMemoryDumpUploaded(true);
-    setMemoryDumpFile(file);
-    setMemoryDumpUrl(fileUrl);
     volatilityForm.setValue("dumpPath", file.name);
     
     toast({
       title: "Memory Dump Uploaded",
       description: `${file.name} (${(file.size / (1024 * 1024)).toFixed(2)} MB) uploaded successfully.`,
     });
-
-    // Log the file URL for debugging
-    console.log("Memory dump uploaded to:", fileUrl);
   };
 
   const startAnalysis = (analysisType: string) => {
@@ -239,11 +232,10 @@ const MemoryForensicsPanel: React.FC<MemoryForensicsPanelProps> = ({ onAnalysisC
     
     toast({
       title: "Running Volatility Plugin",
-      description: `Executing: ${pluginId} on ${memoryDumpFile?.name || 'memory dump'}`,
+      description: `Executing: ${pluginId}`,
     });
     
-    // Simulate plugin execution - in a real implementation, this would call a serverless function
-    // that runs the actual volatility command on the uploaded memory dump file
+    // Simulate plugin execution
     setTimeout(() => {
       const output = generateVolatilityPluginOutput(pluginId);
       setPluginOutput(output);
@@ -291,7 +283,7 @@ const MemoryForensicsPanel: React.FC<MemoryForensicsPanelProps> = ({ onAnalysisC
     
     toast({
       title: "Batch Plugin Execution",
-      description: `Running ${selectedPlugins.length} Volatility plugins on ${memoryDumpFile?.name || 'memory dump'}.`,
+      description: `Running ${selectedPlugins.length} Volatility plugins.`,
     });
     
     let pluginIndex = 0;

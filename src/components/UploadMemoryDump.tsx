@@ -3,12 +3,11 @@ import React, { ChangeEvent, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { toast } from '@/hooks/use-toast';
+import { toast } from '@/components/ui/use-toast';
 import { Upload, FileType } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 
 interface UploadMemoryDumpProps {
-  onUploadComplete: (file: File, fileUrl: string) => void;
+  onUploadComplete: (file: File) => void;
 }
 
 const UploadMemoryDump: React.FC<UploadMemoryDumpProps> = ({ onUploadComplete }) => {
@@ -23,7 +22,7 @@ const UploadMemoryDump: React.FC<UploadMemoryDumpProps> = ({ onUploadComplete })
     }
   };
 
-  const handleUpload = async () => {
+  const handleUpload = () => {
     if (!selectedFile) {
       toast({
         title: "No file selected",
@@ -34,77 +33,23 @@ const UploadMemoryDump: React.FC<UploadMemoryDumpProps> = ({ onUploadComplete })
     }
 
     setIsUploading(true);
-    setUploadProgress(0);
     
-    try {
-      // Create a unique filename to prevent collisions
-      const fileExtension = selectedFile.name.split('.').pop();
-      const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 15)}.${fileExtension}`;
-      const filePath = `${fileName}`;
-
-      // Skip bucket creation because it requires admin privileges
-      // Instead, upload directly to the default public bucket
+    // Simulate upload progress
+    let progress = 0;
+    const interval = setInterval(() => {
+      progress += 10;
+      setUploadProgress(progress);
       
-      // Implement upload with manual progress tracking
-      const chunkSize = 1024 * 1024; // 1MB chunks
-      const fileSize = selectedFile.size;
-      let uploadedBytes = 0;
-      
-      // Read the file as an ArrayBuffer
-      const fileBuffer = await selectedFile.arrayBuffer();
-      
-      // Upload the file directly
-      const { error: uploadError } = await supabase.storage
-        .from('public')
-        .upload(filePath, selectedFile, {
-          cacheControl: '3600',
-          upsert: true
-        });
-
-      if (uploadError) {
-        throw uploadError;
-      }
-
-      // Simulate progress since direct upload doesn't support progress tracking
-      const interval = setInterval(() => {
-        uploadedBytes += chunkSize;
-        if (uploadedBytes >= fileSize) {
-          clearInterval(interval);
-          setUploadProgress(100);
-        } else {
-          const progress = Math.min(Math.round((uploadedBytes / fileSize) * 100), 99);
-          setUploadProgress(progress);
-        }
-      }, 200);
-
-      // Get the public URL for the uploaded file
-      const { data } = supabase.storage
-        .from('public')
-        .getPublicUrl(filePath);
-
-      setTimeout(() => {
+      if (progress >= 100) {
         clearInterval(interval);
-        setUploadProgress(100);
         setIsUploading(false);
-        
         toast({
           title: "Upload complete",
           description: "Memory dump ready for analysis."
         });
-        
-        // Call the onUploadComplete callback with the uploaded file and its URL
-        onUploadComplete(selectedFile, data.publicUrl);
-      }, 1000);
-      
-    } catch (error) {
-      console.error('Upload error:', error);
-      setIsUploading(false);
-      toast({
-        title: "Upload failed",
-        description: error instanceof Error ? error.message : "An unknown error occurred",
-        variant: "destructive"
-      });
-    }
+        onUploadComplete(selectedFile);
+      }
+    }, 300);
   };
 
   return (
